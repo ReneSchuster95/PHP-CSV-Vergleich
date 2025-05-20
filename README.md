@@ -1,5 +1,5 @@
 # PHP-CSV-Vergleich
 
-Einfache CSV Liste vergleich\n
-CSV Format\n
+Einfache CSV Liste vergleich  
+CSV Format  
 ID;Bezeichnung
