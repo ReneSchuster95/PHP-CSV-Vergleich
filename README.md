@@ -64,5 +64,4 @@ ID;Bezeichnung
 **Ergebnis:**
 - Neue: `104`
 - Geändert: `102`
-- Gelöscht: `103`
 

@@ -25,6 +25,7 @@ switch (true) {
 
 <head>
     <meta charset="utf-8" />
+    <title>CSV Comparison</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
