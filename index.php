@@ -1,5 +1,5 @@
 <?php
-//Error Nachrichten
+// Error message handler
 $message = '';
 
 switch (true) {
@@ -20,33 +20,36 @@ switch (true) {
         break;
 }
 ?>
-
-
 <!DOCTYPE html>
-<html>
+<html lang="en">
 
 <head>
     <meta charset="utf-8" />
-    <title></title>
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-    <h1>CSV Vergleich</h1>
+    <h1>CSV Comparison</h1>
+
+    <!-- Upload form for both CSV files -->
     <form action="vergleich.php" method="post" enctype="multipart/form-data" accept-charset="UTF-8">
-        <label for="alte">CSV-Datei Alte:</label>
-        <input type="file" name="alte" id="alte" accept=".csv" required><br><br>
+        <!-- File input for the existing database -->
+        <label for="alte">Database:</label>
+        <input type="file" name="old" id="old" accept=".csv" required><br><br>
 
-        <label for="neue">CSV-Datei neue:</label>
-        <input type="file" name="neue" id="neue" accept=".csv" required><br><br>
+        <!-- File input for the new catalog import -->
+        <label for="neue">Catalog Import:</label>
+        <input type="file" name="new" id="new" accept=".csv" required><br><br>
 
-        <input type="submit" value="Vergleichen" />
+        <input type="submit" value="Compare" />
     </form>
 
+    <!-- Display error message if present -->
     <?php if ($message): ?>
         <div class="error-box"><?= htmlspecialchars($message) ?></div>
     <?php endif; ?>
+
 </body>
 
 </html>

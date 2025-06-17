@@ -1,98 +1,82 @@
 <?php
 session_start();
 
-// Prüfen, ob das Formular per POST gesendet wurde
+// Check request method
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     header("Location: index.php");
     exit;
 }
 
-// Prüfen, ob die erste Datei hochgeladen wurde
-if (!isset($_FILES["alte"]) || $_FILES["alte"]['error'] !== UPLOAD_ERR_OK) {
+// Check if both files are uploaded without errors
+if (!isset($_FILES["old"]) || $_FILES["old"]['error'] !== UPLOAD_ERR_OK) {
     header("Location: index.php?no_file1");
     exit;
 }
-
-// Prüfen, ob die zweite Datei hochgeladen wurde
-if (!isset($_FILES["neue"]) || $_FILES["neue"]['error'] !== UPLOAD_ERR_OK) {
+if (!isset($_FILES["new"]) || $_FILES["new"]['error'] !== UPLOAD_ERR_OK) {
     header("Location: index.php?no_file2");
     exit;
 }
 
-// Arrays zur Speicherung der CSV-Daten
-$csvAlt = [];
-$csvNeu = [];
+// Arrays to store CSV data
+$oldData = [];
+$newData = [];
 
-// Referenzen auf die hochgeladenen Dateien
-$file1 = $_FILES["alte"];
-$file2 = $_FILES["neue"];
-
-// Einlesen der alten CSV-Datei
-if (($handle = fopen($file1['tmp_name'], 'r')) !== false) {
-    while (($data = fgetcsv($handle, 1000, ';')) !== false) {
-        // Es müssen genau zwei Spalten vorhanden sein
-        if (count($data) == 2) {
-            $csvAlt[$data[0]] = $data[1];
+// Load old CSV
+if (($handle = fopen($_FILES["old"]['tmp_name'], 'r')) !== false) {
+    while (($row = fgetcsv($handle, 1000, ';')) !== false) {
+        if (count($row) >= 2) {
+            $id = trim($row[0]);
+            $desc = trim($row[1]);
+            $oldData[$id] = $desc;
         }
     }
     fclose($handle);
 } else {
-    // Datei konnte nicht gelesen werden
     header("Location: index.php?failed_to_read_old");
     exit;
 }
 
-// Einlesen der neuen CSV-Datei
-if (($handle = fopen($file2['tmp_name'], 'r')) !== false) {
-    while (($data = fgetcsv($handle, 1000, ';')) !== false) {
-        // Es müssen mindestens zwei Spalten vorhanden sein
-        if (count($data) >= 2) {
-            $csvNeu[$data[0]] = $data[1];
+// Arrays for differences
+$added = [];     // New entries
+$changed = [];   // Changed entries
+
+// Load and compare new CSV
+if (($handle = fopen($_FILES["new"]['tmp_name'], 'r')) !== false) {
+    while (($row = fgetcsv($handle, 1000, ';')) !== false) {
+        if (count($row) >= 2) {
+            $id = trim($row[0]);
+            $desc = trim($row[1]);
+            $newData[$id] = $desc;
+
+            if (isset($oldData[$id])) {
+                if ($oldData[$id] !== $desc) {
+                    $changed[$id] = $desc;
+                }
+                // ID matched, so remove from oldData to simplify deleted detection
+                unset($oldData[$id]);
+            } else {
+                $added[$id] = $desc;
+            }
         }
     }
     fclose($handle);
 } else {
-    // Datei konnte nicht gelesen werden
     header("Location: index.php?failed_to_read_new");
     exit;
 }
 
-// Arrays zur Speicherung der Änderungen
-$newIDs = [];   // Neue Einträge
-$delIDs = [];   // Gelöschte Einträge
-$change = [];   // Geänderte Bezeichnungen
+// Remaining entries in oldData are deleted ones
+$deleted = $oldData;
 
-// Vergleich der alten CSV mit der neuen
-foreach ($csvAlt as $id => $bezeichnung) {
-    if (isset($csvNeu[$id])) {
-        // Prüfen, ob sich die Bezeichnung geändert hat
-        if ($csvNeu[$id] != $csvAlt[$id]) {
-            $change[$id] = $csvNeu[$id];
-        }
-    } else {
-        // ID existiert nicht mehr -> als gelöscht markieren
-        $delIDs[$id] = $csvAlt[$id];
-    }
-}
-
-// Ermittlung neuer Einträge (IDs, die vorher nicht existierten)
-foreach ($csvNeu as $id => $bezeichnung) {
-    if (!isset($csvAlt[$id])) {
-        $newIDs[$id] = $csvNeu[$id];
-    }
-}
-
-// Funktion zur Ausgabe einer ID-Liste als HTML-Tabelle
-function outputArray($arr)
+// Function to render table rows
+function renderTableRows(array $arr): void
 {
-    foreach ($arr as $id => $bezeichnung) {
-        echo "<tr>";
-        echo "<td>$id</td>";
-        echo "<td>$bezeichnung</td>";
-        echo "</tr>";
+    foreach ($arr as $id => $desc) {
+        echo "<tr><td>" . htmlspecialchars($id) . "</td><td>" . htmlspecialchars($desc) . "</td></tr>";
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html>
 
@@ -113,68 +97,36 @@ function outputArray($arr)
 
     <div class="container">
 
-        <!-- Neue IDs -->
+        <!-- New Entries -->
         <div class="CSVTable">
-            <h3>Neue IDs:</h3>
+            <h3>New IDs:</h3>
             <table>
                 <tr>
                     <th>ID</th>
-                    <th>Bezeichnung</th>
+                    <th>Description</th>
                 </tr>
-                <?php
-                // Gibt alle neuen IDs in einer Tabelle aus
-                outputArray($newIDs);
-                ?>
+                <?php renderTableRows($added); ?>
             </table>
             <form method="post" action="download.php">
-                <!-- Übergabe des Dateinamens -->
-                <input type="hidden" name="filename" value="Neue_IDs.csv">
-                <!-- Übergabe der Daten als base64-kodiertes, serialisiertes Array -->
-                <input type="hidden" name="data" value="<?php echo base64_encode(serialize($newIDs)); ?>">
+                <input type="hidden" name="filename" value="New_IDs.csv">
+                <input type="hidden" name="data" value="<?= base64_encode(serialize($added)) ?>">
                 <button type="submit">Download CSV</button>
             </form>
         </div>
 
-        <!-- Gelöschte IDs -->
+        <!-- Changed Entries -->
         <div class="CSVTable">
-            <h3>Gelöschte IDs:</h3>
+            <h3>Changed Descriptions:</h3>
             <table>
                 <tr>
                     <th>ID</th>
-                    <th>Bezeichnung</th>
+                    <th>New Description</th>
                 </tr>
-                <?php
-                // Gibt alle gelöschten IDs in einer Tabelle aus
-                outputArray($delIDs);
-                ?>
+                <?php renderTableRows($changed); ?>
             </table>
             <form method="post" action="download.php">
-                <!-- Übergabe des Dateinamens -->
-                <input type="hidden" name="filename" value="Geloeschte_IDs.csv">
-                <!-- Übergabe der Daten als base64-kodiertes, serialisiertes Array -->
-                <input type="hidden" name="data" value="<?php echo base64_encode(serialize($delIDs)); ?>">
-                <button type="submit">Download CSV</button>
-            </form>
-        </div>
-
-        <!-- Geänderte Bezeichnungen -->
-        <div class="CSVTable">
-            <h3>Geänderte Bezeichnungen:</h3>
-            <table>
-                <tr>
-                    <th>ID</th>
-                    <th>Bezeichnung</th>
-                </tr>
-                <?php
-                // Gibt alle geänderten Bezeichnungen in einer Tabelle aus
-                outputArray($change);
-                ?>
-            </table>
-            <form method="post" action="download.php">
-                <!-- Übergabe des Dateinamens -->
-                <input type="hidden" name="filename" value="Geaenderte_Bezeichnungen.csv">
-                <!-- Übergabe der Daten als base64-kodiertes, serialisiertes Array -->
-                <input type="hidden" name="data" value="<?php echo base64_encode(serialize($change)); ?>">
+                <input type="hidden" name="filename" value="Changed_Descriptions.csv">
+                <input type="hidden" name="data" value="<?= base64_encode(serialize($changed)) ?>">
                 <button type="submit">Download CSV</button>
             </form>
         </div>
